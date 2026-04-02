@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HAND·BUILD — 3D AR</title>
+<title>HAND·BUILD — 3D AR (2 Hands)</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
   :root {
@@ -15,11 +15,10 @@
 
   #video {
     position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:0;
-    transform:scaleX(-1); /* mirror webcam */
+    transform:scaleX(-1);
   }
 
   #threeCanvas { position:fixed; inset:0; z-index:1; }
-
   #handOverlay { position:fixed; inset:0; z-index:5; pointer-events:none; }
 
   #hud { 
@@ -53,12 +52,6 @@
   #ctrl{position:fixed;bottom:220px;left:18px;z-index:20;display:flex;flex-direction:column;gap:7px;}
   .cb{background:var(--panel);border:1px solid rgba(0,255,247,.25);color:var(--cyan);font-size:10.5px;letter-spacing:1px;padding:7px 16px;border-radius:5px;cursor:pointer;transition:all .15s;}
   .cb:hover{background:rgba(0,255,247,.13);border-color:var(--cyan);box-shadow:0 0 14px rgba(0,255,247,.35);}
-
-  #loading{position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;}
-  #loading h1{font-family:'Orbitron',sans-serif;font-size:29px;font-weight:900;letter-spacing:8px;color:var(--cyan);text-shadow:0 0 32px var(--cyan);animation:gp 1.5s infinite;}
-  .lb{width:320px;height:4px;background:rgba(0,255,247,.1);border-radius:3px;overflow:hidden;}
-  .lf{height:100%;background:linear-gradient(90deg,var(--cyan),var(--pink));animation:ld 3s ease forwards;}
-  @keyframes ld{from{width:0}to{width:100%}}
 </style>
 </head>
 <body>
@@ -68,7 +61,7 @@
 <canvas id="handOverlay"></canvas>
 
 <div id="hud">
-  <div class="title">HAND<span>·</span>BUILD</div>
+  <div class="title">HAND·BUILD <span>2H</span></div>
   <div class="stats">
     <div class="stat"><b id="v-blocks">0</b><s>BLOCKS</s></div>
     <div class="stat"><b id="v-fps">--</b><s>FPS</s></div>
@@ -79,16 +72,16 @@
 </div>
 
 <div id="gp">
-  <div class="gc on" id="c-pinch"><i>✌️</i><h4>PINCH BUILD</h4><p>2 ngón chạm → đặt khối tự do 3D</p></div>
-  <div class="gc" id="c-fist"><i>✊</i><h4>FIST GRAB</h4><p>Nắm tay → kéo nhóm khối</p></div>
-  <div class="gc" id="c-open"><i>🖐️</i><h4>OPEN RELEASE</h4><p>Mở tay → thả & snap</p></div>
-  <div class="gc" id="c-point"><i>☝️</i><h4>POINT ORBIT</h4><p>Ngón trỏ → xoay góc nhìn</p></div>
+  <div class="gc on" id="c-pinch"><i>✌️</i><h4>PINCH BUILD</h4><p>2 ngón chạm (cả 2 tay) → đặt khối</p></div>
+  <div class="gc" id="c-fist"><i>✊</i><h4>FIST GRAB</h4><p>Nắm tay → kéo khối</p></div>
+  <div class="gc" id="c-open"><i>🖐️</i><h4>OPEN RELEASE</h4><p>Mở tay → thả</p></div>
+  <div class="gc" id="c-point"><i>☝️</i><h4>POINT ORBIT</h4><p>Ngón trỏ → xoay camera</p></div>
 </div>
 
 <div id="sb">
   <div class="sl"><div class="dot" id="d-cam"></div><span id="t-cam">CAMERA LIVE</span></div>
   <div class="sl"><div class="dot" id="d-mp"></div><span id="t-mp">AR READY</span></div>
-  <div id="gname">WAITING FOR HAND...</div>
+  <div id="gname">WAITING FOR HANDS...</div>
 </div>
 
 <div id="ctrl">
@@ -98,23 +91,12 @@
   <button class="cb" onclick="resetCam()">🎥 RESET CAM</button>
 </div>
 
-<div id="loading">
-  <h1>HAND·BUILD</h1>
-  <div class="lb"><div class="lf"></div></div>
-  <p id="load-msg">INITIALIZING AR...</p>
-</div>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-// ====================== THREE.JS AR SETUP ======================
-const renderer = new THREE.WebGLRenderer({
-  canvas: document.getElementById('threeCanvas'),
-  antialias: true,
-  alpha: true
-});
+// ====================== THREE.JS SETUP ======================
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('threeCanvas'), antialias: true, alpha: true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(devicePixelRatio);
-renderer.shadowMap.enabled = true;
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x001122, 0.008);
@@ -133,9 +115,8 @@ const blocks = [];
 let wireMode = false;
 const PAL = [{m:0x00fff7, e:0x002233}];
 
-function snap(v){ return Math.round(v/BS)*BS; }
-
 const bMap = new Map();
+function snap(v){ return Math.round(v/BS)*BS; }
 function bKey(x,y,z){ return `${Math.round(x/BS)},${Math.round(y/BS)},${Math.round(z/BS)}`; }
 
 function makeBlock(x,y,z){
@@ -144,19 +125,17 @@ function makeBlock(x,y,z){
   const mat = new THREE.MeshPhongMaterial({color:c.m, emissive:c.e, shininess:100, wireframe:wireMode});
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(x,y,z);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
+  mesh.castShadow = mesh.receiveShadow = true;
   scene.add(mesh);
   blocks.push(mesh);
 
+  // spawn animation
   mesh.scale.setScalar(0.01);
-  mat.transparent = true;
-  mat.opacity = 0;
+  mat.transparent = true; mat.opacity = 0;
   let t = 0;
   const anim = () => {
-    t = Math.min(t + 0.15, 1);
-    const s = 1 - Math.pow(1-t, 3);
-    mesh.scale.setScalar(s);
+    t = Math.min(t + 0.18, 1);
+    mesh.scale.setScalar(1 - Math.pow(1-t, 3));
     mat.opacity = t;
     if(t < 1) requestAnimationFrame(anim);
     else mat.transparent = false;
@@ -167,50 +146,30 @@ function makeBlock(x,y,z){
 }
 
 function placeAt(wp){
-  const sx = snap(wp.x);
-  const sy = Math.max(0, snap(wp.y));
-  const sz = snap(wp.z);
+  const sx = snap(wp.x), sy = Math.max(0.2, snap(wp.y)), sz = snap(wp.z);
   const k = bKey(sx, sy, sz);
   if(!bMap.has(k)){
     bMap.set(k, makeBlock(sx, sy, sz));
   }
 }
 
-// ====================== CURSOR 3D (tự do theo góc nhìn) ======================
-function getCursorPos(lms, isPinch = false){
-  let hx, hy, hz;
-  if(isPinch){
-    hx = (lms[4].x + lms[8].x) / 2;
-    hy = (lms[4].y + lms[8].y) / 2;
-    hz = (lms[4].z + lms[8].z) / 2;
-  } else {
-    hx = lms[9].x; hy = lms[9].y; hz = lms[9].z;
-  }
-
-  const ndcX = 2 * (1 - hx) - 1;
-  const ndcY = 1 - 2 * hy;
-
-  const vector = new THREE.Vector3(ndcX, ndcY, 0.5);
-  vector.unproject(camera);
-  const dir = vector.sub(camera.position).normalize();
-
-  let distance = 14 + hz * -85;
-  distance = Math.max(6, Math.min(48, distance));
-
-  return camera.position.clone().add(dir.multiplyScalar(distance));
+// ====================== CURSORS (2 tay) ======================
+const cursors = [];
+function createCursor(){
+  const group = new THREE.Group();
+  const mat = new THREE.MeshPhongMaterial({color:0x00fff7, emissive:0x004444, transparent:true, opacity:0.9});
+  group.add(new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), mat));
+  group.add(new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.04, 8, 32),
+    new THREE.MeshBasicMaterial({color:0x00fff7, transparent:true, opacity:0.5})));
+  scene.add(group);
+  group.visible = false;
+  return {group, mat};
 }
-
-// 3D Cursor
-const curG = new THREE.Group(); scene.add(curG);
-const curMat = new THREE.MeshPhongMaterial({color:0x00fff7, emissive:0x004444, transparent:true, opacity:0.92});
-curG.add(new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), curMat));
-const ring = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.04, 8, 32), 
-  new THREE.MeshBasicMaterial({color:0x00fff7, transparent:true, opacity:0.55}));
-curG.add(ring);
-curG.visible = false;
+cursors.push(createCursor());
+cursors.push(createCursor());
 
 // ====================== CAMERA ORBIT ======================
-let cTgt = new THREE.Vector3(0, 3, 0), camTheta = 0.3, camPhi = Math.PI/3.5, camR = 24;
+let cTgt = new THREE.Vector3(0, 3, 0), camTheta = 0.4, camPhi = Math.PI/3.2, camR = 24;
 function updateOrbit(){
   camera.position.set(
     cTgt.x + camR * Math.sin(camPhi) * Math.sin(camTheta),
@@ -221,133 +180,132 @@ function updateOrbit(){
 }
 updateOrbit();
 
-// ====================== EVENT LISTENERS ======================
-const tc = document.getElementById('threeCanvas');
-let drag = false, mx = 0, my = 0;
+// ====================== RAYCAST POSITION ======================
+function getWorldPos(lm){
+  const ndcX = 2 * (1 - lm.x) - 1;
+  const ndcY = 1 - 2 * lm.y;
+  const vector = new THREE.Vector3(ndcX, ndcY, 0.5);
+  vector.unproject(camera);
+  const dir = vector.sub(camera.position).normalize();
+  const distance = Math.max(6, Math.min(48, 14 - lm.z * 90));
+  return camera.position.clone().add(dir.multiplyScalar(distance));
+}
 
-tc.addEventListener('mousedown', e => { drag = true; mx = e.clientX; my = e.clientY; });
-tc.addEventListener('mouseup', () => { drag = false; });
-tc.addEventListener('mousemove', e => {
-  if (!drag) return;
-  camTheta -= (e.clientX - mx) * 0.0055;
-  camPhi = Math.max(0.15, Math.min(Math.PI/2 - 0.15, camPhi - (e.clientY - my) * 0.0055));
-  mx = e.clientX; my = e.clientY;
-  updateOrbit();
-});
-tc.addEventListener('wheel', e => {
-  camR = Math.max(6, Math.min(65, camR + e.deltaY * 0.07));
-  updateOrbit();
-});
+// ====================== STATE ======================
+let lastPlaceTime = 0;
+const PLACE_COOLDOWN = 50; // cho phép đặt nhanh hơn khi dùng 2 tay
+const grabbed = []; // [{mesh, offset, handIndex}]
 
-window.addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-  ov.width = innerWidth; ov.height = innerHeight;
-});
-
-// ====================== OVERLAY ======================
+// ====================== RENDER LOOP ======================
+let fps = 0, fpsTime = Date.now();
 const ov = document.getElementById('handOverlay');
 const ovCtx = ov.getContext('2d');
 ov.width = innerWidth; ov.height = innerHeight;
 
-let curLMs = null, curGesture = 'IDLE';
-let lastPlaceTime = 0;
-const PLACE_COOLDOWN = 55;
-
 function animate(){
   requestAnimationFrame(animate);
-
-  // FPS
-  if(Date.now() - (window.lastFps||0) > 1000){
-    document.getElementById('v-fps').textContent = window.fpsCount || '--';
-    window.fpsCount = 0;
-    window.lastFps = Date.now();
+  fps++;
+  if(Date.now() - fpsTime > 1000){
+    document.getElementById('v-fps').textContent = fps;
+    fps = 0; fpsTime = Date.now();
   }
-  window.fpsCount = (window.fpsCount||0) + 1;
 
-  ring.rotation.z += 0.06;
-
-  if(curLMs){
-    curG.visible = true;
-    const isPinch = curGesture === 'PINCH';
-    const targetPos = getCursorPos(curLMs, isPinch);
-    curG.position.lerp(targetPos, 0.35);
-  } else {
-    curG.visible = false;
-  }
+  // Update cursors
+  cursors.forEach(c => c.group.visible = false);
 
   renderer.render(scene, camera);
 }
 animate();
 
-// ====================== GESTURE DETECTION & LOGIC ======================
-const grabbed = [];
+// ====================== GESTURE & MULTI-HAND ======================
+function detect(lms){
+  const dist = (a,b) => Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
+  const PIP=[6,10,14,18], TIPS=[8,12,16,20];
+  const ext = TIPS.map((t,i) => lms[t].y < lms[PIP[i]].y);
+  const pinchD = dist(lms[4], lms[8]);
+
+  if(pinchD < 0.065) return {name:'PINCH'};
+  if(!ext[0] && !ext[1] && !ext[2] && !ext[3]) return {name:'FIST'};
+  if(ext[0] && !ext[1] && !ext[2] && !ext[3]) return {name:'POINT', tip:lms[8]};
+  if(ext[0] && ext[1] && ext[2] && ext[3]) return {name:'OPEN'};
+  return {name:'IDLE'};
+}
 
 function onResults(results){
-  const n = results.multiHandLandmarks?.length || 0;
-  document.getElementById('v-hands').textContent = n;
+  const handsCount = results.multiHandLandmarks?.length || 0;
+  document.getElementById('v-hands').textContent = handsCount;
   document.querySelectorAll('.gc').forEach(el => el.classList.remove('on'));
 
-  if(!n){
-    curLMs = null; curGesture = 'IDLE';
+  if(handsCount === 0){
+    document.getElementById('gname').textContent = 'NO HANDS';
     releaseGroup(false);
-    document.getElementById('gname').textContent = 'NO HAND DETECTED';
     return;
   }
 
-  const lms = results.multiHandLandmarks[0];
-  curLMs = lms;
+  document.getElementById('gname').textContent = `${handsCount} HAND${handsCount>1?'S':''} ACTIVE`;
 
-  const g = detect(lms);
-  curGesture = g.name;
-  document.getElementById('gname').textContent = g.name.toUpperCase();
+  const now = Date.now();
 
-  // PINCH - Đặt khối tự do
-  if(g.name === 'PINCH'){
-    document.getElementById('c-pinch').classList.add('on');
-    const now = Date.now();
-    if(now - lastPlaceTime > PLACE_COOLDOWN){
-      const wp = getCursorPos(lms, true);
-      placeAt(wp);
-      lastPlaceTime = now;
+  results.multiHandLandmarks.forEach((lms, handIndex) => {
+    const g = detect(lms);
+    const cursor = cursors[handIndex];
+    if(!cursor) return;
+
+    // Update cursor position
+    const worldPos = getWorldPos(lms[9]); // palm center
+    cursor.group.position.lerp(worldPos, 0.4);
+    cursor.group.visible = true;
+
+    // Pinch - Tạo khối
+    if(g.name === 'PINCH'){
+      document.getElementById('c-pinch').classList.add('on');
+      if(now - lastPlaceTime > PLACE_COOLDOWN){
+        const pinchPos = getWorldPos({x: (lms[4].x + lms[8].x)/2, y: (lms[4].y + lms[8].y)/2, z: (lms[4].z + lms[8].z)/2 });
+        placeAt(pinchPos);
+        lastPlaceTime = now;
+      }
     }
-  }
 
-  // FIST - Grab
-  if(g.name === 'FIST'){
-    document.getElementById('c-fist').classList.add('on');
-    const wp = getCursorPos(lms);
-    if(!grabbed.length){
-      const R = 6.5;
-      blocks.forEach(b => {
-        if(b.position.distanceTo(wp) < R){
-          grabbed.push({mesh:b, offset: b.position.clone().sub(wp)});
-          b.material.emissive.setHex(0x003344);
-        }
-      });
-      document.getElementById('v-sel').textContent = grabbed.length;
-    } else {
-      const wp2 = getCursorPos(lms);
-      grabbed.forEach(({mesh, offset}) => {
-        const tgt = wp2.clone().add(offset);
-        tgt.y = Math.max(0.2, tgt.y);
-        mesh.position.lerp(tgt, 0.32);
-      });
+    // Fist - Grab
+    if(g.name === 'FIST'){
+      document.getElementById('c-fist').classList.add('on');
+      const wp = getWorldPos(lms[9]);
+      if(!grabbed.some(g => g.handIndex === handIndex)){
+        const R = 7;
+        blocks.forEach(b => {
+          if(b.position.distanceTo(wp) < R && !grabbed.some(g => g.mesh === b)){
+            grabbed.push({mesh: b, offset: b.position.clone().sub(wp), handIndex});
+            b.material.emissive.setHex(0x003344);
+          }
+        });
+        document.getElementById('v-sel').textContent = grabbed.length;
+      } else {
+        // Move grabbed blocks by this hand
+        const wp2 = getWorldPos(lms[9]);
+        grabbed.forEach(item => {
+          if(item.handIndex === handIndex){
+            const tgt = wp2.clone().add(item.offset);
+            tgt.y = Math.max(0.2, tgt.y);
+            item.mesh.position.lerp(tgt, 0.35);
+          }
+        });
+      }
     }
-  }
 
-  if(g.name === 'OPEN'){
-    document.getElementById('c-open').classList.add('on');
-    releaseGroup(true);
-  }
+    // Point - Orbit camera (cho phép cả 2 tay xoay)
+    if(g.name === 'POINT'){
+      document.getElementById('c-point').classList.add('on');
+      camTheta -= (g.tip.x - 0.5) * 0.04;
+      camPhi = Math.max(0.15, Math.min(Math.PI/2 - 0.15, camPhi - (g.tip.y - 0.4) * 0.03));
+      updateOrbit();
+    }
 
-  if(g.name === 'POINT'){
-    document.getElementById('c-point').classList.add('on');
-    camTheta -= (g.tip.x - 0.5) * 0.038;
-    camPhi = Math.max(0.15, Math.min(Math.PI/2 - 0.15, camPhi - (g.tip.y - 0.42) * 0.028));
-    updateOrbit();
-  }
+    // Open - Release
+    if(g.name === 'OPEN'){
+      document.getElementById('c-open').classList.add('on');
+      releaseGroup(true);
+    }
+  });
 }
 
 function releaseGroup(doSnap){
@@ -362,29 +320,16 @@ function releaseGroup(doSnap){
   document.getElementById('v-sel').textContent = 0;
 }
 
-function detect(lms){
-  const dist = (a,b) => Math.hypot(a.x-b.x, a.y-b.y, a.z-b.z);
-  const PIP = [6,10,14,18], TIPS = [8,12,16,20];
-  const ext = TIPS.map((t,i) => lms[t].y < lms[PIP[i]].y);
-  const pinchD = dist(lms[4], lms[8]);
-
-  if(pinchD < 0.065) return {name:'PINCH'};
-  if(!ext[0] && !ext[1] && !ext[2] && !ext[3]) return {name:'FIST'};
-  if(ext[0] && !ext[1] && !ext[2] && !ext[3]) return {name:'POINT', tip:lms[8]};
-  if(ext[0] && ext[1] && ext[2] && ext[3]) return {name:'OPEN'};
-  return {name:'IDLE'};
-}
-
 // ====================== INIT ======================
 async function main(){
   const vid = document.getElementById('video');
-  try{
-    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user', width:1280, height:720}});
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: 'user', width: 1280, height: 720}});
     vid.srcObject = stream;
     await vid.play();
     document.getElementById('d-cam').className = 'dot ok';
-  } catch(e){
-    document.getElementById('t-cam').textContent = 'CAMERA ERROR';
+  } catch(e) {
+    document.getElementById('t-cam').textContent = 'CAM ERROR';
   }
 
   await Promise.all([
@@ -393,16 +338,21 @@ async function main(){
   ]);
 
   const hands = new Hands({locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}`});
-  hands.setOptions({maxNumHands:2, modelComplexity:1, minDetectionConfidence:0.78, minTrackingConfidence:0.68});
+  hands.setOptions({
+    maxNumHands: 2,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.75,
+    minTrackingConfidence: 0.65
+  });
   hands.onResults(onResults);
 
   const mpCam = new Camera(vid, {
-    onFrame: async () => { await hands.send({image: vid}); },
+    onFrame: async () => await hands.send({image: vid}),
     width: 1280, height: 720
   });
 
   await mpCam.start();
-  document.getElementById('loading').style.display = 'none';
+  document.getElementById('loading')?.remove(); // xóa loading nếu có
   document.getElementById('d-mp').className = 'dot ok';
 }
 
@@ -417,23 +367,13 @@ function loadScript(src){
 
 main();
 
-// Demo blocks
-setTimeout(() => {
-  for(let i = -5; i <= 5; i += 2) makeBlock(i*1.4, 1.5, -10);
-}, 1000);
-
-// Global functions
-window.clearAll = () => { 
-  blocks.forEach(b => scene.remove(b)); 
-  blocks.length = 0; 
-  bMap.clear(); 
-  document.getElementById('v-blocks').textContent = 0; 
-};
+// Global controls
+window.clearAll = () => { blocks.forEach(b=>scene.remove(b)); blocks.length=0; bMap.clear(); document.getElementById('v-blocks').textContent=0; };
 window.undoLast = () => {
   if(!blocks.length) return;
   const b = blocks.pop();
   scene.remove(b);
-  bMap.forEach((v,k) => { if(v === b) bMap.delete(k); });
+  bMap.forEach((v,k)=>{if(v===b) bMap.delete(k);});
   document.getElementById('v-blocks').textContent = blocks.length;
 };
 window.toggleWire = () => {
@@ -441,7 +381,7 @@ window.toggleWire = () => {
   blocks.forEach(b => b.material.wireframe = wireMode);
 };
 window.resetCam = () => {
-  camTheta = 0.3; camPhi = Math.PI/3.5; camR = 24;
+  camTheta = 0.4; camPhi = Math.PI/3.2; camR = 24;
   cTgt.set(0, 3, 0);
   updateOrbit();
 };
