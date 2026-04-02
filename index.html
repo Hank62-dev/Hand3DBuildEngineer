@@ -393,7 +393,7 @@ async function main(){
   ]);
 
   const hands = new Hands({locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}`});
-  hands.setOptions({maxNumHands:1, modelComplexity:1, minDetectionConfidence:0.78, minTrackingConfidence:0.68});
+  hands.setOptions({maxNumHands:2, modelComplexity:1, minDetectionConfidence:0.78, minTrackingConfidence:0.68});
   hands.onResults(onResults);
 
   const mpCam = new Camera(vid, {
